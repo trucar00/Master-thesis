@@ -1,0 +1,5 @@
+# Ignore all big files!
+
+*.parquet
+*.csv
+Data/

@@ -45,8 +45,7 @@ def main(months, filtered_path, concat_path):
             dfs.append(pd.read_parquet(fp, engine="pyarrow"))
 
         concat_df = pd.concat(dfs, ignore_index=True)
-        out_fp = concat_path / f"{month:02d}.parquet"
-        concat_df.to_parquet(out_fp, engine="pyarrow", index=False)
+        concat_df.to_parquet(f"{concat_path}/{month:02d}.parquet", engine="pyarrow", index=False)
 
     end = time()
     print("Done! It took:", (end - start) / 60, "minutes.")

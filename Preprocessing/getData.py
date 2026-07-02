@@ -6,11 +6,11 @@ import glob
 # --- Gets the copy of NTNUs AIS-data from Kystverket ---
 # --- readFilterSave() reads the parquet files, and filters out fishing vessels within region ---
 
-def main(months, filtered_path, year):
+def main(months, raw_ais_path, filtered_path):
     start = time()
     print("Getting data from NTNUs copy of AIS-data from Kystverket.")
     for month in range(1, months+1):
-        pattern = f"../../Data/{year}/date_utc={year}-{month:02d}-*" # ADD Y: for running locally
+        pattern = f"{raw_ais_path}-{month:02d}-*" # ADD Y: for running locally
         folders = sorted(glob.glob(pattern))
         if not folders:
             print("No folders for month:", month)
@@ -20,7 +20,7 @@ def main(months, filtered_path, year):
                 if entry.is_file() and entry.name.endswith(".parquet"):
                     print("Processing file: ", entry.path)
                     day += 1
-                    dataProcessing.readFilterSave(entry.path, f"{filtered_path}{month:02d}-{day:02d}.parquet") #use readFilterSave2 for STS
+                    dataProcessing.readFilterSave(entry.path, f"{filtered_path}/{month:02d}-{day:02d}.parquet") #use readFilterSave2 for STS
 
     end = time()
     print("Done! It took: ", (end-start)/60, " minutes.")

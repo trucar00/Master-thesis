@@ -9,22 +9,22 @@ import pickle
 import optuna
 from pathlib import Path
 
-WINDOW = 256
-STRIDE = 128
 
 # TAG FOR FILES
 TAG = "BILSTM_tune-2023-no-val-test"
-FOLDER = "tuning_FINAL"
+FOLDER = "Fishing_no_fishing_classification/LSTM"
 
 print("--------", TAG, "----------")
 
 # ------------------------------------------------------------------
-# FILES and FEATURES
+# Tune on 2023 data excluding the val and test mmsis from 2024 that also exist in 2023
 # ------------------------------------------------------------------
-TUNING_FILES = ["three_months/feats_new_rule_online/2023_1_3_feats.parquet",
-                "three_months/feats_new_rule_online/2023_4_6_feats.parquet",
-                "three_months/feats_new_rule_online/2023_7_9_feats.parquet",
-                "three_months/feats_new_rule_online/2023_10_12_feats.parquet"] 
+FEATURESETS_PATH = "Fishing_no_fishing_classification/Featuresets"
+
+TUNING_FILES = [f"{FEATURESETS_PATH}/2023_1_3_online.parquet",
+                f"{FEATURESETS_PATH}/2023_4_6_online.parquet",
+                f"{FEATURESETS_PATH}/2023_7_9_online.parquet",
+                f"{FEATURESETS_PATH}/2023_10_12_online.parquet"] 
 
 BASE_FEATURES = ["cog_sin", "cog_cos", "speed_calc_ms", "ra_accel", "ra_jerk", "log_dist", "ra_dcog", "log_dt"]
 
@@ -42,7 +42,7 @@ def all_mmsis_in(files):
         s.update(mmsis.unique())
     return s
 
-def get_global_val_test_mmsis(which, path="../train_val_test_mmsis_FINAL.csv"):
+def get_global_val_test_mmsis(which, path="Fishing_no_fishing_classification/train_val_test_mmsis.csv"):
     split_df = pd.read_csv(path)
     split_df["mmsi"] = split_df["mmsi"].astype("int64")
     mmsis = set(split_df.loc[split_df["split"] == which,"mmsi"])
@@ -71,7 +71,7 @@ train_mmsis = set(tuning_mmsis[:int(0.80*n)])
 val_mmsis   = set(tuning_mmsis[int(0.80*n):])
 
 
-print(f"Train 80% of Q1 Q3 2023 vessels excluding the global val and test mmsis: {len(train_mmsis)} | Val 20% of the available vessels: {len(val_mmsis)}")
+print(f"Train 80% of 2023 vessels excluding the global val and test mmsis: {len(train_mmsis)} | Val 20% of the available vessels: {len(val_mmsis)}")
 print(f"Are there vessels in both train and val?: "
       f"{len(train_mmsis & val_mmsis)}")
 
@@ -201,9 +201,7 @@ class FishingBiLSTM(nn.Module):
         logits = self.head(h).squeeze(-1)  # (B, T)
         return logits
 
-# ------------------------------------------------------------------
-# Device + class imbalance (pos_weight fit on TRAIN / Q1)
-# ------------------------------------------------------------------
+# Device + class imbalance (pos_weight fit on TRAIN)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
  
@@ -226,9 +224,8 @@ def masked_loss(logits, y, mask):
     per = bce(logits, y)
     return (per * m).sum() / m.sum().clamp_min(1.0)
 
-# ------------------------------------------------------------------
-# Caching: train caches come from Q1, val caches from Q3
-# ------------------------------------------------------------------
+
+# Caching
 def cache_windows(files, mmsi_set, name, window, stride):
     out_path = Path(f"{FOLDER}/cache_{name}_w{window}_s{stride}_{TAG}.pt")
     if out_path.exists():
@@ -289,9 +286,9 @@ def run_epoch(model, loader, optimizer, device, train: bool):
     acc  = (tp + tn) / max(tp + fp + fn + tn, 1)
     return avg, prec, rec, f1, acc
 
-# ------------------------------------------------------------------
+
 # Train one config (Optuna pruning supported)
-# ------------------------------------------------------------------
+
 def train_one_config(cfg, trial=None, max_epochs=6):
     torch.manual_seed(42)
  
@@ -345,9 +342,8 @@ def train_one_config(cfg, trial=None, max_epochs=6):
  
     return best
 
-# ------------------------------------------------------------------
+
 # Optuna objective + study
-# ------------------------------------------------------------------
 def objective(trial):
     cfg = {
         "hidden":   trial.suggest_categorical("hidden", [64, 128, 256]),

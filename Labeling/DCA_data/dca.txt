@@ -1,0 +1,4 @@
+The DCA data can be obtained from:
+
+https://www.fiskeridir.no/statistikk-tall-og-analyse/data-og-statistikk-om-yrkesfiske/apne-data-elektronisk-rapportering-ers
+

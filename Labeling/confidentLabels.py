@@ -90,7 +90,7 @@ def load_ais_w_labels(df, allowed_report, gear):
 
     df["row_id"] = np.arange(len(df))
 
-    # Checking columns for deciding if reported no_fishing is acutally true no fishing
+    # Columns for deciding if reported no_fishing is acutally true no fishing
     df["high_speed"] = 0
     df["no_fish_cl"] = 0
     df["close_to_shore"] = 0
@@ -418,14 +418,10 @@ def add_confidence_flags(df):
 SPEED_THRESHOLD = 10  
 SPEED_WINDOW = pd.Timedelta(minutes=20)
 
-PORT_THRESHOLD_KM = 5
 SHORE_THRESHOLD_KM = 5
 
-HALF_WINDOW = pd.Timedelta(minutes=20) # looks 40 minutes in total then? maybe a bit long?
+HALF_WINDOW = pd.Timedelta(minutes=20) # looks 40 minutes in total
 MIN_MESSAGES = 10
-
-ALLOWED = ["Not", "no_fishing"]
-GEAR_SET = {"Not"}
 
 LIST = [{"Not"}, {"Trål"}, {"Krokredskap"}, {"Snurrevad"}, {"Garn"}, {"Bur og ruser"}]
 
@@ -433,18 +429,16 @@ ALLOWED_LIST = [["Not", "no_fishing"], ["Trål", "no_fishing"], ["Krokredskap", 
 
 N_CLUSTERS = 2
 
-def main3():
-    #path = "sub_labels/ais_ers_sub_labels_"
-    path = "new_duration_limits/ais_ers_labels_"
-    for year in range(2023, 2023+1):
-        for start in range(1, 12+1, 3):   # starts at 1 and 
+def main(direct_labels_path, confident_labels_path, year):
+    for year in range(year, year+1): # can do multiple years at the same time
+        for start in range(1, 12+1, 3):   # starts at 1 and increases by 3 for each step. 1, 4, 7
             dfs = []
             for i in range(start, start + 3):
-                df = pd.read_parquet(f"{path}{i:02d}_{year}.parquet")
+                df = pd.read_parquet(f"{direct_labels_path}/{i:02d}_{year}.parquet")
                 df["trajectory_id"] = df["trajectory_id"].astype(str) + "-" + str(year) + "-" + str(i) # new unique traj_id
                 dfs.append(df)
 
-            base_df = pd.concat(dfs, ignore_index=True)
+            base_df = pd.concat(dfs, ignore_index=True) # concat three and three months
     
             for i in range(6):  # ALL gear
                 g = LIST[i]
@@ -456,7 +450,6 @@ def main3():
     
                 df = speed_rule(df, speed_threshold=SPEED_THRESHOLD, window_len=SPEED_WINDOW)
         
-                #df = close_to_port(df, threshold_km=PORT_THRESHOLD_KM)
                 df = close_to_shore(df, threshold_km=SHORE_THRESHOLD_KM)
         
                 feats_df_for_clustering = features_for_clustering(df, half_window=HALF_WINDOW, min_messages=MIN_MESSAGES)
@@ -469,7 +462,7 @@ def main3():
                 gear_name = next(iter(g))
                 if gear_name == "Bur og ruser": # Does not change the values in "report" == Bur og ruser ...
                     gear_name = "Traps"
-                df.to_parquet(f"confident_new_rule_new_duration/{gear_name}_{year}_{start}_{start+2}.parquet", index=False)
+                df.to_parquet(f"{confident_labels_path}/{gear_name}_{year}_{start}_{start+2}.parquet", index=False)
 
                 del df, feats_df_for_clustering
                 gc.collect()
@@ -479,7 +472,7 @@ def main3():
     return
 
 
-def plot(df, gear_set):
+def plot(df, gear_set): # plotting function to see the messages and the unknown, confident non fishing and reported fishing. 
 
     for traj_id, d in df.groupby("trajectory_id"):
         
@@ -535,7 +528,7 @@ def plot(df, gear_set):
 
 
 if __name__ == "__main__":
-    main3()
+    main()
 
 
     #df = pd.read_parquet("conf_labels/Not_2024_1_3.parquet")

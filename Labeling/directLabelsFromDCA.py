@@ -56,11 +56,11 @@ def assign_ais_message_to_label(df_ais, df_dca):
     return df_labeled
 
 
-def main(clean_dca_path, clean_path, year):
+def main(clean_dca_path, clean_path, direct_labels_path, year):
 
     df_dca = pd.read_csv(clean_dca_path)
     registered_callsigns = get_registered_callsigns(df_dca) # All unique callsigns in the DCA data
-    print("Nr of vessels in dca", len(registered_callsigns))
+    print("Nr of vessels in dca ", len(registered_callsigns))
 
     for month in range(1, 13):
         filepath = f"{clean_path}/{month:02d}.parquet"
@@ -68,7 +68,7 @@ def main(clean_dca_path, clean_path, year):
         df_ais = read_ais_parquet(parquet_path=filepath)
 
         df_ais_with_labels = assign_ais_message_to_label(df_ais, df_dca)
-        df_ais_with_labels.to_parquet(f"Labeling/Direct_labels/{month:02d}_{year}.parquet", index=False)
+        df_ais_with_labels.to_parquet(f"{direct_labels_path}/{month:02d}_{year}.parquet", index=False)
 
 
 if __name__ == "__main__":

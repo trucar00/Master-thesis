@@ -5,7 +5,7 @@ import torch.nn as nn
 import pickle
 from pathlib import Path
 import json
-import gc
+
 
 FOLDER = "Fishing_no_fishing_classification/LSTM"
 
@@ -25,7 +25,6 @@ if tuned_params_path.exists():
     BATCH = best_params["batch"]
     LR = best_params["lr"]
 
-# Previous base parameters
 else:
     print("Tuned parameters not found, exiting program...")
     exit()
@@ -36,9 +35,11 @@ SEASON_FEATURES = ["month_sin", "month_cos"]
 
 FEATURES = BASE_FEATURES + SEASON_FEATURES
 
-MODEL_PATH = f"{FOLDER}/Models/model_lstm_train_2023_and_2024.pt"
+MODEL_PATH = f"{FOLDER}/Models/model_lstm_train_2023_and_2024_FULL_FINAL.pt"
+FEATURESETS_PATH = "Fishing_no_fishing_classification/Featuresets"
+PREDICTIONS_PATH = f"{FOLDER}/Predictions"
 
-# The LSTM model
+# The model
 class FishingLSTM(nn.Module):
     def __init__(self, n_features, hidden=HIDDEN, n_layers=N_LAYERS,
                  dropout=DROPOUT, dense=DENSE):
@@ -64,7 +65,7 @@ class FishingLSTM(nn.Module):
         return logits
 
 
-# Load mu and  sigma from training on 2023 and 2024.
+# Load mu and sigma
 mu_sigma_path = Path(f"{FOLDER}/parameters_lstm_train_2023_and_2024.pkl")
 with open(mu_sigma_path, "rb") as f:
     params = pickle.load(f)
@@ -74,24 +75,12 @@ sigma = params["sigma"]
 print("Read mu and sigma from file")
 
 
-# Load data with already-built features
+# Load featuresets
 
-FOLDER_BASE = "three_months/all_vessels_2025"
-ALL_VESSELS_2025_FILES = [
-    f"{FOLDER_BASE}/all_vessels_2025_1_2.parquet",
-    f"{FOLDER_BASE}/all_vessels_2025_3_4.parquet",
-    f"{FOLDER_BASE}/all_vessels_2025_5_6.parquet",
-    f"{FOLDER_BASE}/all_vessels_2025_7_8.parquet",
-    f"{FOLDER_BASE}/all_vessels_2025_9_10.parquet",
-    f"{FOLDER_BASE}/all_vessels_2025_11_12.parquet",
-]
+for i in range(1, 12+1, 3):
+            
+    df_predict = pd.read_parquet(f"{FEATURESETS_PATH}/2025_{i}_{i+2}_online.parquet")
 
-save_id = 1 # id to keep track on the pairwise files
-
-for f in ALL_VESSELS_2025_FILES:
-    print("Loading and predicting file ", f)
-    df_predict = pd.read_parquet(f, engine="pyarrow")
-    
     df_predict["date_time_utc"] = pd.to_datetime(df_predict["date_time_utc"])
     month = df_predict["date_time_utc"].dt.month
 
@@ -108,9 +97,7 @@ for f in ALL_VESSELS_2025_FILES:
     df_predict["ra_dcog"]  = df_predict["ra_dcog"].clip(-5, 5)
 
 
-    # --------------------------------------------------
     # Load model
-    # --------------------------------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = FishingLSTM(
@@ -187,12 +174,8 @@ for f in ALL_VESSELS_2025_FILES:
             df_predict.loc[idx, "p_fishing"] = traj_probs
 
     df_predict["pred_fishing"] = (df_predict["p_fishing"] > 0.5).astype(int)
-    df_predict.to_parquet(f"{FOLDER}/Predictions/2025_all_vessels_monthpair-{save_id}.parquet", index=False)
-    save_id += 1
+    df_predict.to_parquet(f"{PREDICTIONS_PATH}/2025_{i}_{i+2}_w_lstm_full_model.parquet", index=False)
 
     print(df_predict[["trajectory_id", "date_time_utc", "mmsi",
                     "p_fishing", "pred_fishing"]].head())
     print(df_predict["pred_fishing"].value_counts())
-
-    del df_predict
-    gc.collect()

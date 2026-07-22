@@ -186,12 +186,13 @@ def main(online):
             df = add_features(df, online)
             print(df.shape)
             df = df[KEEP_COLS]
-            df.to_parquet(f"{FEATURESETS_PATH}/all_vessels_{year}_{i}_{i+1}.parquet", index=False)
+            df.to_parquet(f"{FEATURESETS_PATH}/all_vessels_unlabeled_{year}_{i}_{i+1}.parquet", index=False)
             del df
             gc.collect()
 
 
 if __name__ == "__main__":
+    russian(online=True)
     concat_all_2025_vessels()
     main(online=True)
-    russian(online=True)
+    

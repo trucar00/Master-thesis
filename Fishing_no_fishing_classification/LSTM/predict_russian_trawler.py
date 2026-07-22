@@ -35,11 +35,11 @@ SEASON_FEATURES = ["month_sin", "month_cos"]
 
 FEATURES = BASE_FEATURES + SEASON_FEATURES
 
-MODEL_PATH = "models/model_lstm_train_2023_and_2024_FULL_FINAL.pt"
+MODEL_PATH = f"{FOLDER}/Models/model_lstm_train_2023_and_2024_FULL_FINAL.pt"
+FEATURESETS_PATH = "Fishing_no_fishing_classification/Featuresets"
+PREDICTIONS_PATH = f"{FOLDER}/Predictions"
 
-# --------------------------------------------------
-# Same model class as training
-# --------------------------------------------------
+# The model
 class FishingLSTM(nn.Module):
     def __init__(self, n_features, hidden=HIDDEN, n_layers=N_LAYERS,
                  dropout=DROPOUT, dense=DENSE):
@@ -65,12 +65,9 @@ class FishingLSTM(nn.Module):
         return logits
 
 
-# --------------------------------------------------
-# Recompute the same normalization stats from 2023 and 2024
-# Better: save mu/sigma during training and load them.
-# --------------------------------------------------
 
-mu_sigma_path = Path(f"params/parameters_lstm_train_2023_and_2024.pkl")
+# Load mu and sigma
+mu_sigma_path = Path(f"{FOLDER}/parameters_lstm_train_2023_and_2024.pkl")
 with open(mu_sigma_path, "rb") as f:
     params = pickle.load(f)
 
@@ -78,13 +75,8 @@ mu = params["mu"]
 sigma = params["sigma"]
 print("Read mu and sigma from file")
 
-# --------------------------------------------------
-# Load data with already-built features
-# If not built yet: run df_predict = add_features(raw_may_df)
-# --------------------------------------------------
 
-#df_predict = pd.read_parquet("three_months/feats_new_rule_online/2025_10_12_feats.parquet")
-df_predict = pd.read_parquet("russian_svalbard_trawler_feats_online.parquet")
+df_predict = pd.read_parquet(f"{FEATURESETS_PATH}/russian_svalbard_trawler_feats_online.parquet") # Featureset to predict
 df_predict["date_time_utc"] = pd.to_datetime(df_predict["date_time_utc"])
 month = df_predict["date_time_utc"].dt.month
 
@@ -101,9 +93,7 @@ df_predict["ra_jerk"]  = df_predict["ra_jerk"].clip(-5, 5)
 df_predict["ra_dcog"]  = df_predict["ra_dcog"].clip(-5, 5)
 
 
-# --------------------------------------------------
 # Load model
-# --------------------------------------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = FishingLSTM(
@@ -117,24 +107,12 @@ model = FishingLSTM(
 model.load_state_dict(torch.load(MODEL_PATH, map_location=device, weights_only=True))
 model.eval()
 
-# --------------------------------------------------
-# Predict May and merge overlapping window predictions
-# --------------------------------------------------
-df_predict = df_predict.sort_values(["trajectory_id", "date_time_utc"]).copy()
 
-# ---------- 6. ONLINE sliding-window inference ----------
-#
-# For each message at time t we feed the model the window x_{t-W+1} ... x_t
-# (zero-padded on the LEFT for the first W-1 messages, which is equivalent to
-# starting from a cold LSTM state — exactly what the model saw at training time
-# at the start of each window). We take only the prediction at the LAST position.
-#
-# This means every message gets exactly ONE prediction, using only past info.
-# No averaging over overlapping windows.
+df_predict = df_predict.sort_values(["trajectory_id", "date_time_utc"]).copy() # sort by trajectory-id and datetime
 
-INFER_BATCH = 256   # how many "ending-at-t" windows to forward in one pass
 
-df_predict = df_predict.sort_values(["trajectory_id", "date_time_utc"]).copy()
+INFER_BATCH = 256  
+
 df_predict["p_fishing"] = np.nan
 
 with torch.no_grad():
@@ -145,11 +123,7 @@ with torch.no_grad():
         if n < 1:
             continue
 
-        # --- Cold-start phase: positions t = 0 .. min(WINDOW, n) - 1 ---
-        # A single forward pass on X_all[:WINDOW] gives the causal predictions
-        # at all those positions (because the LSTM is unidirectional, the
-        # output at position k uses only inputs 0..k — equivalent to feeding
-        # sequences of length 1, 2, ..., WINDOW from a zero state).
+    
         head_len = min(WINDOW, n)
         x_head = torch.from_numpy(X_all[:head_len][None, :, :]).to(device)
         probs_head = torch.sigmoid(model(x_head))[0].cpu().numpy()  # (head_len,)
@@ -157,8 +131,7 @@ with torch.no_grad():
         traj_probs = np.empty(n, dtype=np.float32)
         traj_probs[:head_len] = probs_head
 
-        # --- Steady-state phase: positions t = WINDOW .. n-1 ---
-        # For each such t, window is X_all[t-WINDOW+1 : t+1], take last pred.
+
         if n > WINDOW:
             # Build all sliding windows in one go using stride tricks
             sw = np.lib.stride_tricks.sliding_window_view(
@@ -166,8 +139,8 @@ with torch.no_grad():
             )                                  # shape: (n - WINDOW + 1, F, WINDOW)
             sw = sw.transpose(0, 2, 1)         # -> (n - WINDOW + 1, WINDOW, F)
             sw = sw[1:]                        # drop window ending at WINDOW-1
-                                               #   (already covered by head)
-            # Now sw[k] is the window ending at position WINDOW + k.
+                                          
+  
 
             for i in range(0, len(sw), INFER_BATCH):
                 batch_np = np.ascontiguousarray(sw[i:i+INFER_BATCH])
@@ -180,7 +153,7 @@ with torch.no_grad():
         df_predict.loc[idx, "p_fishing"] = traj_probs
 
 df_predict["pred_fishing"] = (df_predict["p_fishing"] > 0.5).astype(int)
-df_predict.to_parquet("pred_russian_trawler_lstm_full.parquet", index=False)
+df_predict.to_parquet(f"{PREDICTIONS_PATH}/pred_russian_trawler_lstm.parquet", index=False)
 
 print(df_predict[["trajectory_id", "date_time_utc", "mmsi",
                   "p_fishing", "pred_fishing"]].head())

@@ -62,6 +62,8 @@ PATIENCE = 3
 
 TAG = "lstm_train_2023_val_test_2024"
 
+PREDICTIONS_PATH = f"{FOLDER}/Predictions"
+
 def all_mmsis_in(files):
     s = set()
     for f in files:
@@ -409,9 +411,9 @@ def predict_and_score_test(model, seen, seed):
 
     if seed==0:
         if seen:
-            df.to_parquet(f"{FOLDER}/LSTM_2024_seen_test_seed{seed}_full.parquet", index=False)
+            df.to_parquet(f"{PREDICTIONS_PATH}/LSTM_2024_seen_test_seed{seed}_full.parquet", index=False)
         else:
-            df.to_parquet(f"{FOLDER}/LSTM_2024_UNseen_test_seed{seed}.parquet", index=False)
+            df.to_parquet(f"{PREDICTIONS_PATH}/LSTM_2024_UNseen_test_seed{seed}.parquet", index=False)
 
     pred_fishing = df["pred_fishing"].to_numpy(copy=False)
     p_fishing = df["p_fishing"].to_numpy(copy=False)

@@ -195,7 +195,7 @@ def concat():
 
 
 def main(online):
-    for year in range(2023, 2023+1):
+    for year in range(2023, 2025+1):
         for i in range(1, 12+1, 3):
             df = pd.read_parquet(f"{CONCATENATED_LABELED_AIS_PATH}/{year}_{i}_{i+2}.parquet", engine="pyarrow")
             print("Fixing columns")

@@ -12,7 +12,7 @@ from pathlib import Path
 
 # TAG FOR FILES
 TAG = "BILSTM_tune-2023-no-val-test"
-FOLDER = "Fishing_no_fishing_classification/LSTM"
+FOLDER = "Fishing_no_fishing_classification/BiLSTM"
 
 print("--------", TAG, "----------")
 
@@ -21,10 +21,10 @@ print("--------", TAG, "----------")
 # ------------------------------------------------------------------
 FEATURESETS_PATH = "Fishing_no_fishing_classification/Featuresets"
 
-TUNING_FILES = [f"{FEATURESETS_PATH}/2023_1_3_online.parquet",
-                f"{FEATURESETS_PATH}/2023_4_6_online.parquet",
-                f"{FEATURESETS_PATH}/2023_7_9_online.parquet",
-                f"{FEATURESETS_PATH}/2023_10_12_online.parquet"] 
+TUNING_FILES = [f"{FEATURESETS_PATH}/2023_1_3_offline.parquet",
+                f"{FEATURESETS_PATH}/2023_4_6_offline.parquet",
+                f"{FEATURESETS_PATH}/2023_7_9_offline.parquet",
+                f"{FEATURESETS_PATH}/2023_10_12_offline.parquet"] 
 
 BASE_FEATURES = ["cog_sin", "cog_cos", "speed_calc_ms", "ra_accel", "ra_jerk", "log_dist", "ra_dcog", "log_dt"]
 

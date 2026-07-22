@@ -2,6 +2,8 @@ import pandas as pd
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
+import gc
+import rasterio
 
 # -- HELPER FUNCTIONS --
 def haversine(lat1, lon1, lat2, lon2):
@@ -29,36 +31,16 @@ def haversine(lat1, lon1, lat2, lon2):
 def angle_wrap(a):
     return (a + 180) % 360 - 180
 # ---------------------------
-FEATURES = ["cog_sin", "cog_cos", "speed_calc_ms", "accel", "ra_accel", "jerk", "ra_jerk", "dcog", "ra_dcog", "log_dist", "log_dt"] # Accel and jerk are removed later
-GEAR = ["Trål", "Not", "Krokredskap", "Snurrevad", "Garn", "Traps", "Bur og ruser"]
-CONCAT_GEAR = ["Trål", "Not", "Krokredskap", "Snurrevad", "Garn", "Traps"]
 
+FEATURES = ["cog_sin", "cog_cos", "speed_calc_ms", "accel", "ra_accel", "jerk", "ra_jerk", "dcog", "ra_dcog", "log_dist", "log_dt"]
+GEAR = ["Trål", "Not", "Krokredskap", "Snurrevad", "Garn", "Traps"]
 
-CONFIDENT_LABELS_PATH = "Labeling/Confident_labels"
+KEEP_COLS = ["mmsi", "trajectory_id", "date_time_utc", "lon", "lat"] + FEATURES
+
 FEATURESETS_PATH = "Fishing_no_fishing_classification/Featuresets"
-CONCATENATED_LABELED_AIS_PATH = "Fishing_no_fishing_classification/Concatenated_labeled_ais"
 
-def column_fixing(df):
-    df["gear_report"] = df["report"]
-    df.loc[df["conf_no_fishing"], "report"] = "conf_no_fishing"
-    df.loc[df["unknown_no_fishing"], "report"] = "unknown"
 
-    df = df.drop(columns=["row_id", "high_speed", "no_fish_cl", "close_to_shore", "passed_any_rule", "conf_no_fishing", "unknown_no_fishing"])
-
-    counts = df["report"].value_counts()
-    print(counts)
-
-    # Include all fishing as FISHING
-   
-    for gear in GEAR:
-        df.loc[df["report"] == gear, "report"] = "fishing"
-
-    print(df["report"].unique())
-    return df
-
-# Build features
-
-def add_features(df, online=False):
+def add_features(df, online):
     df = df.copy()
     df["date_time_utc"] = pd.to_datetime(df["date_time_utc"])
     df = df.sort_values(["trajectory_id", "date_time_utc"]).copy()
@@ -90,15 +72,6 @@ def add_features(df, online=False):
     df["cog_sin"] = np.sin(np.radians(df["cog"]))
     df["cog_cos"] = np.cos(np.radians(df["cog"]))
 
-    # Binary label
-    df["y"] = np.nan
-    df.loc[df["report"] == "fishing", "y"] = 1
-    df.loc[df["report"] == "conf_no_fishing", "y"] = 0
-    
-    # Sample weight, unknown = 0
-    df["sample_weight"] = df["y"].notna().astype(np.float32)
-    df["y_train"] = df["y"].fillna(0).astype(np.float32) # replacing NaN with 0, now the unknowns have y_train = 0 and sample weight = 0
-
     # Calculated speed in m/s
     df["speed_calc_ms"] = df["dist_to_prev"] / df["dt"]
 
@@ -114,7 +87,7 @@ def add_features(df, online=False):
     df["dcog"] = angle_wrap(df["cog"] - df["prev_cog"]) / df["dt"]
 
     # Remove invalid rows
-    feature_cols = ["dt", "dist_to_prev", "speed_calc_ms", "accel", "jerk", "dcog", "dist_to_shore_km"]
+    feature_cols = ["dt", "dist_to_prev", "speed_calc_ms", "accel", "jerk", "dcog"]
     df = df.replace([np.inf, -np.inf], np.nan)
     df = df.dropna(subset=feature_cols).copy()
 
@@ -127,7 +100,6 @@ def add_features(df, online=False):
     # Smooth noisy derivative features
     SMOOTH_COLS = ["accel", "jerk", "dcog"]
     WINDOW = 5
-
     if online:
         for col in SMOOTH_COLS:
             df[f"ra_{col}"] = (
@@ -144,14 +116,15 @@ def add_features(df, online=False):
 
     return df
 
+#df = add_features(df)
+
 def check_feats(df):
-    counts = df["report"].value_counts().reset_index()
-    counts.columns = ["report", "nr_messages"]
+    counts = df["label"].value_counts().reset_index()
+    counts.columns = ["label", "nr_messages"]
     print(counts)
 
     print(df[FEATURES].isna().sum())
     print(np.isinf(df[FEATURES]).sum())
-    #print(df["y"].value_counts(dropna=False))
 
     print(df[FEATURES].describe().T[["mean", "std", "min", "max"]])
     print(df[FEATURES].abs().max().sort_values(ascending=False))
@@ -181,36 +154,44 @@ def check_speed(df):
     print("speed (m/s):", dist / row["dt"])
 
 
-def concat():
-    for i in range(1, 12+1, 3):
-        
-        for year in range(2023, 2025+1):
-            dfs = []
-            for gear in CONCAT_GEAR:
-                df = pd.read_parquet(f"{CONFIDENT_LABELS_PATH}/{gear}_{year}_{i}_{i+2}.parquet", engine="pyarrow")
-                dfs.append(df)
-        
-            all_gear_full_month_df = pd.concat(dfs, ignore_index=True)
-            all_gear_full_month_df.to_parquet(f"{CONCATENATED_LABELED_AIS_PATH}/{year}_{i}_{i+2}.parquet", index=False)
+CLEAN_PATH = "Preprocessing/Processed_AIS_2025/Cleaned"
+CONCATENATED_UNLABELED_AIS_PATH = "Fishing_no_fishing_classification/Concatenated_unlabeled_ais"
+
+RUSSIAN_TRAWLER_CLEANED_PATH = "Preprocessing/Cases/russian_svalbard_trawler_cleaned.parquet"
+RUSSIAN_TRAWLER_FEATS_PATH = f"{FEATURESETS_PATH}/russian_svalbard_trawler_feats.parquet"
+
+def russian(online):
+    df = pd.read_parquet(RUSSIAN_TRAWLER_CLEANED_PATH, engine="pyarrow")
+    df = add_features(df, online)
+    df.to_parquet(RUSSIAN_TRAWLER_FEATS_PATH, index=False)
+    print(df.shape)
+
+def concat_all_2025_vessels():
+    for i in range(1, 12+1, 2):
+        dfs = []
+        for j in range(i, i+2):
+            df = pd.read_parquet(f"{CLEAN_PATH}/{j:02d}.parquet", engine="pyarrow")
+            dfs.append(df)
+
+        all_vessels_three_months = pd.concat(dfs, ignore_index=True)
+        all_vessels_three_months.to_parquet(f"{CONCATENATED_UNLABELED_AIS_PATH}/all_vessels_2025_{i}_{i+1}.parquet", index=False)
 
 
 def main(online):
-    for year in range(2023, 2023+1):
-        for i in range(1, 12+1, 3):
-            df = pd.read_parquet(f"{CONCATENATED_LABELED_AIS_PATH}/{year}_{i}_{i+2}.parquet", engine="pyarrow")
-            print("Fixing columns")
-            df = column_fixing(df)
-            df = add_features(df, online=online)
-            check_feats(df)
-            print(df["report"].unique())
+    for year in range(2025, 2025+1):
+        for i in range(1, 12+1, 2):
+            df = pd.read_parquet(f"{CONCATENATED_UNLABELED_AIS_PATH}/all_vessels_{year}_{i}_{i+1}.parquet", engine="pyarrow")
+            print("Nr of unique trajs: ", df["trajectory_id"].nunique())
+            print(df.shape)
+            df = add_features(df, online)
+            print(df.shape)
+            df = df[KEEP_COLS]
+            df.to_parquet(f"{FEATURESETS_PATH}/all_vessels_{year}_{i}_{i+1}.parquet", index=False)
+            del df
+            gc.collect()
 
-            if online: save_path = f"{FEATURESETS_PATH}/{year}_{i}_{i+2}_online.parquet"
-            else: save_path = f"{FEATURESETS_PATH}/{year}_{i}_{i+2}_offline.parquet"
-
-            df.to_parquet(save_path, index=False)
 
 if __name__ == "__main__":
-    #concat()
+    concat_all_2025_vessels()
     main(online=True)
-    
-    #concat2()
+    russian(online=True)

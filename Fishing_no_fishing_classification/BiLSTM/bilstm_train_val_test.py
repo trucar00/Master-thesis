@@ -12,7 +12,8 @@ import gc
 import random
 
 # Load tuned parameters
-tuned_params_path = Path("tuning_FINAL/best_params_BILSTM_tune-2023-no-val-test.json")
+FOLDER = "Fishing_no_fishing_classification/BiLSTM"
+tuned_params_path = Path(f"{FOLDER}/best_params_BILSTM_tune-2023-no-val-test.json")
 
 if tuned_params_path.exists():
     with open(tuned_params_path, "r") as file:
@@ -38,22 +39,22 @@ else:
     LR       = 9.27e-4
     exit()
 
-BASE = "three_months/feats_new_rule_bilstm"
+BASE = "Fishing_no_fishing_classification/Featuresets"
 
 # TRAIN: all of 2023
 TRAIN_FILES = [
-    f"{BASE}/2023_1_3_feats.parquet",     # Q1 2023
-    f"{BASE}/2023_4_6_feats.parquet",     # Q2 2023
-    f"{BASE}/2023_7_9_feats.parquet",     # Q3 2023
-    f"{BASE}/2023_10_12_feats.parquet",   # Q4 2023
+    f"{BASE}/2023_1_3_offline.parquet",     # Q1 2023
+    f"{BASE}/2023_4_6_offline.parquet",     # Q2 2023
+    f"{BASE}/2023_7_9_offline.parquet",     # Q3 2023
+    f"{BASE}/2023_10_12_offline.parquet",   # Q4 2023
 ]
 
 # VALIDATION and TEST on 2024. We have MMSIS for validation and MMSIS for testing
 VAL_TEST_FILES = [
-    f"{BASE}/2024_1_3_feats.parquet",     # Q1 2024
-    f"{BASE}/2024_4_6_feats.parquet",     # Q2 2024
-    f"{BASE}/2024_7_9_feats.parquet",     # Q3 2024
-    f"{BASE}/2024_10_12_feats.parquet",   # Q4 2024
+    f"{BASE}/2024_1_3_offline.parquet",     # Q1 2024
+    f"{BASE}/2024_4_6_offline.parquet",     # Q2 2024
+    f"{BASE}/2024_7_9_offline.parquet",     # Q3 2024
+    f"{BASE}/2024_10_12_offline.parquet",   # Q4 2024
 ]
 
 
@@ -67,7 +68,6 @@ SEEDS = [0] # ADD MORE SEEDS
 MAX_EPOCHS = 15
 PATIENCE = 3
 
-FOLDER = "training_FINAL/"
 TAG = "bilstm_train_2023_val_test_2024_final"
 
 def all_mmsis_in(files):
@@ -78,7 +78,7 @@ def all_mmsis_in(files):
         s.update(mmsis.unique())
     return s
 
-def get_global_val_test_mmsis(which, path="../train_val_test_mmsis_FINAL.csv"):
+def get_global_val_test_mmsis(which, path="Fishing_no_fishing_classification/train_val_test_mmsis.csv"):
     split_df = pd.read_csv(path)
     split_df["mmsi"] = split_df["mmsi"].astype("int64")
     return set(split_df.loc[split_df["split"] == which, "mmsi"])
@@ -352,7 +352,7 @@ df_test = prepare_test_df(df_test)
 
 # TEST ON FUTURE BUT SEEN VESSELS in training -> train on norwegian vessels, predict future norwegian vessels
 random.seed(42)
-train_mmsi_list = random.sample(sorted(train_mmsis), k=len(train_mmsis)) # full length
+train_mmsi_list = random.sample(sorted(train_mmsis), k=len(train_mmsis)) # full length, can reduce length with // 4 fex if compute is limited.
 print(f"Nr of train mmsis to use for seen test: ", len(train_mmsi_list))
 df_test_seen = get_test_df(VAL_TEST_FILES, train_mmsi_list)
 df_test_seen = prepare_test_df(df_test_seen)
@@ -417,9 +417,9 @@ def predict_and_score_external(model, seen, seed):
 
     if seed==0:
         if seen:
-            df.to_parquet(f"{FOLDER}/test_vessels_2024/BiLSTM_2024_seen_test_seed{seed}.parquet", index=False)
+            df.to_parquet(f"{FOLDER}/BiLSTM_2024_seen_test_seed{seed}.parquet", index=False)
         else:
-            df.to_parquet(f"{FOLDER}/test_vessels_2024/BiLSTM_2024_UNseen_test_seed{seed}.parquet", index=False)
+            df.to_parquet(f"{FOLDER}/BiLSTM_2024_UNseen_test_seed{seed}.parquet", index=False)
 
     sample_weight = df["sample_weight"].to_numpy(copy=False)
     y_train = df["y_train"].to_numpy(copy=False)
@@ -527,7 +527,7 @@ for seed in SEEDS:
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=0.5, patience=2)
 
-    model_name = f"models/seed/model_bilstm_seed{seed}_final_FULL.pt"
+    model_name = f"{FOLDER}/Models/model_bilstm_seed{seed}.pt"
     best_val = float("inf")
     bad = 0
     history = []
@@ -546,7 +546,7 @@ for seed in SEEDS:
             "val_r":      vl[2], "val_f1":   vl[3], "val_acc": vl[4],
         })
         pd.DataFrame(history).to_csv(
-            f"training_stats/training_history_BiLSTM_seed{seed}_final_FULL.csv", index=False
+            f"{FOLDER}/training_history_BiLSTM_seed{seed}.csv", index=False
         )
         if vl[0] < best_val:
             best_val = vl[0]
@@ -562,7 +562,7 @@ for seed in SEEDS:
     model.load_state_dict(torch.load(model_name, map_location=device))
     
     # testernal 2025_1_3 test — the metric that matters
-    """ test_unseen = predict_and_score_external(model, seen=False, seed=seed)
+    test_unseen = predict_and_score_external(model, seen=False, seed=seed)
 
     print(f"[seed {seed}] TEST on UNSEEN vessels in 2024 | "
           f"precision {test_unseen['unseen_precision']:.3f} "
@@ -570,7 +570,7 @@ for seed in SEEDS:
           f"specificity {test_unseen['unseen_specificity']:.3f} "
           f"f1 {test_unseen['unseen_f1']:.3f} "
           f"accuracy {test_unseen['unseen_accuracy']:.3f} "
-          f"loss {test_unseen['unseen_loss']:.4f} ") """
+          f"loss {test_unseen['unseen_loss']:.4f} ")
     
     test_seen = predict_and_score_external(model, seen=True, seed=seed)
 
@@ -586,13 +586,13 @@ for seed in SEEDS:
         "seed": seed,
         "best_val_loss": best_val,
         "epochs_trained": len(history),
-        #**test_unseen,
+        **test_unseen,
         **test_seen,
     }
     all_results.append(row)
 
-    # Save incrementally so a crash doesn't lose everything
-    #pd.DataFrame(all_results).to_csv(results_csv_path, index=False)
+    # Save so a crash doesn't lose everything
+    pd.DataFrame(all_results).to_csv(results_csv_path, index=False)
     torch.cuda.synchronize()
     del model, optimizer, scheduler
     gc.collect()
@@ -616,9 +616,6 @@ summary = df_res[metric_cols].agg(["mean", "std"]).T
 summary.columns = ["mean", "std"]
 print("\nMean / Std across seeds:")
 print(summary)
-#summary.to_csv(f"{FOLDER}/BiLSTM_seed_results_summary_full.csv")
+summary.to_csv(f"{FOLDER}/BiLSTM_seed_results_summary_full.csv")
 print(f"\nPer-seed rows: {results_csv_path}")
 print(f"Summary:       {FOLDER}/BiLSTM_seed_results_summary_full.csv")
-
-
-# IMPLEMENT

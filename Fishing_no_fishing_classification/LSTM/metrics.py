@@ -10,11 +10,6 @@ PREDICTIONS_PATH = f"{FOLDER}/Predictions"
 files = [
     f"{PREDICTIONS_PATH}/LSTM_2024_seen_test_seed0_full.parquet",
     #f"{PREDICTIONS_PATH}/LSTM_2024_UNseen_test_seed0.parquet",
-    #f"{PREDICTIONS_PATH}/2025_1_3_w_lstm_full_model.parquet",
-    #f"{PREDICTIONS_PATH}/2025_4_6_w_lstm_full_model.parquet",
-    #f"{PREDICTIONS_PATH}/2025_7_9_w_lstm_full_model.parquet",
-    #f"{PREDICTIONS_PATH}/2025_10_12_w_lstm_full_model.parquet",
-    # ...
 ]
 
 columns = [

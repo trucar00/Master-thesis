@@ -111,20 +111,9 @@ for i in range(1, 12+1, 3):
     model.load_state_dict(torch.load(MODEL_PATH, map_location=device, weights_only=True))
     model.eval()
 
-    # --------------------------------------------------
-    # Predict May and merge overlapping window predictions
-    # --------------------------------------------------
     df_predict = df_predict.sort_values(["trajectory_id", "date_time_utc"]).copy()
 
-    # ---------- 6. ONLINE sliding-window inference ----------
-    #
-    # For each message at time t we feed the model the window x_{t-W+1} ... x_t
-    # (zero-padded on the LEFT for the first W-1 messages, which is equivalent to
-    # starting from a cold LSTM state — exactly what the model saw at training time
-    # at the start of each window). We take only the prediction at the LAST position.
-    #
-    # This means every message gets exactly ONE prediction, using only past info.
-    # No averaging over overlapping windows.
+  
 
     INFER_BATCH = 256   # how many "ending-at-t" windows to forward in one pass
 
@@ -139,11 +128,7 @@ for i in range(1, 12+1, 3):
             if n < 1:
                 continue
 
-            # --- Cold-start phase: positions t = 0 .. min(WINDOW, n) - 1 ---
-            # A single forward pass on X_all[:WINDOW] gives the causal predictions
-            # at all those positions (because the LSTM is unidirectional, the
-            # output at position k uses only inputs 0..k — equivalent to feeding
-            # sequences of length 1, 2, ..., WINDOW from a zero state).
+
             head_len = min(WINDOW, n)
             x_head = torch.from_numpy(X_all[:head_len][None, :, :]).to(device)
             probs_head = torch.sigmoid(model(x_head))[0].cpu().numpy()  # (head_len,)

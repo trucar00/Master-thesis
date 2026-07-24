@@ -83,8 +83,7 @@ Fishing_no_fishing_classification/
 
 Order of operations:
 1. Run `features_for_labeled.py` and `features_for_unlabeled.py`.
-2. Run `get_mmsi_split.py` to obtain the MMSI-level train/validation/test split
-   (note: sort the tuning MMSI set before shuffling, for reproducibility).
+2. Run `get_mmsi_split.py` to obtain the MMSI-level train/validation/test split.
 3. Run `xgb_tuning.py` and `xgb_seeds.py` for the XGBoost baseline.
 4. Run `lstm_optuna.py` and `bilstm_optuna.py` for hyperparameter tuning.
 5. Run `lstm_train_val_test.py` and `bilstm_train_val_test.py` for evaluation.
@@ -94,15 +93,15 @@ Order of operations:
 ### 4. Gear-type classification
 ```
 Gear_type_classification/
-├── extract_only_gear_reports.py   # Keep only segments with a reported fishing gear
-├── features.py                    # Feature extraction
-├── create_dataset.py              # Assemble the training dataset
-└── cnn_model.py                   # 1D CNN training and evaluation
+├── resample.py                             # Resample the AIS data
+├── features_extract_fishing_segments.py    # Feature extraction
+├── create_dataset.py                       # Assemble the training dataset
+└── cnn_model.py                            # 1D CNN training and evaluation
 ```
 
 Order of operations:
-1. Run `extract_only_gear_reports.py`.
-2. Run `features.py`.
+1. Run `resample.py`.
+2. Run `features_extract_fishing_segments.py`.
 3. Run `create_dataset.py`.
 4. Run `cnn_model.py`.
 

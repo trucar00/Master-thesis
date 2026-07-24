@@ -112,4 +112,4 @@ speed distributions, gap analysis, gear-report statistics, case-study vessel tra
 Each script can be run independently once the relevant upstream data/models exist.
 
 
-The README file was generated with assistance from Claude. As of now the repo is not ready to run with one shared main and the filepaths in the different scripts will likely lead to some crashes and needs to be updated. I will improve the structure and readability of the repo later.
+The README file was generated with assistance from Claude. As of now the repo is not ready to run with one shared main and the filepaths in the different scripts will likely lead to some crashes and needs to be updated as one runs the scripts. I will improve the structure and readability of the repo later.

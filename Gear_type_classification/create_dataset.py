@@ -16,19 +16,22 @@ WINDOW = 120
 TRAIN_SLIDE  = 60
 TEST_SLIDE = 120
 
-FOLDER_BASE = "../../LSTM/three_months/resampled"
+FOLDER = "Gear_type_classification"
+RESAMPLE_PATH = F"{FOLDER}/Resampled"
+FEATURE_PATH = f"{FOLDER}/Featuresets"
+
 TRAIN_FILES = [
-    f"{FOLDER_BASE}/2023_1_3_feats.parquet", 
-    f"{FOLDER_BASE}/2023_4_6_feats.parquet", 
-    f"{FOLDER_BASE}/2023_7_9_feats.parquet", 
-    f"{FOLDER_BASE}/2023_10_12_feats.parquet"
+    f"{FEATURE_PATH}/2023_1_3.parquet", 
+    f"{FEATURE_PATH}/2023_4_6.parquet", 
+    f"{FEATURE_PATH}/2023_7_9.parquet", 
+    f"{FEATURE_PATH}/2023_10_12.parquet"
     ]
 
 VAL_TEST_FILES = [
-    f"{FOLDER_BASE}/2024_1_3_feats.parquet", 
-    f"{FOLDER_BASE}/2024_4_6_feats.parquet", 
-    f"{FOLDER_BASE}/2024_7_9_feats.parquet", 
-    f"{FOLDER_BASE}/2024_10_12_feats.parquet"
+    f"{FEATURE_PATH}/2024_1_3.parquet", 
+    f"{FEATURE_PATH}/2024_4_6.parquet", 
+    f"{FEATURE_PATH}/2024_7_9.parquet", 
+    f"{FEATURE_PATH}/2024_10_12.parquet"
 ]
 
 
@@ -40,7 +43,7 @@ def all_mmsis_in(files):
         s.update(mmsis.unique())
     return s
 
-def get_global_val_test_mmsis(which, path="../../train_val_test_mmsis_FINAL.csv"):
+def get_global_val_test_mmsis(which, path="Fishing_no_fishing_classification/train_val_test_mmsis.csv"): # same train, test and val mmsis as for the binary classification
     split_df = pd.read_csv(path)
     split_df["mmsi"] = split_df["mmsi"].astype("int64")
     return set(split_df.loc[split_df["split"] == which, "mmsi"])
@@ -67,7 +70,7 @@ def add_features(df, mmsis):
 # ------------------------------------------------------------------
 # Normalization stats -- fit on TRAIN (2023) only
 # ------------------------------------------------------------------
-def get_mu_sigma(mu_sigma_path="parameters_cnn_gear_2023_train_all_FINAL.pkl"):
+def get_mu_sigma(mu_sigma_path=f"{FOLDER}/parameters_cnn_gear_2023.pkl"):
     mu_sigma_path = Path(f"{mu_sigma_path}")
     if mu_sigma_path.exists():
         print(f"Loading mu/sigma from {mu_sigma_path}")
@@ -184,20 +187,20 @@ groups_test_seen = meta_test_seen["mmsi"].to_numpy()
 print(pd.Series(y_test_seen).value_counts())
 
 
-np.save("datasets/X_train_all.npy", X_train)
-np.save("datasets/y_train_all.npy", y_train)
-np.save("datasets/groups_train_all.npy", groups_train)
+np.save(f"{FEATURE_PATH}/X_train_all.npy", X_train)
+np.save(f"{FEATURE_PATH}/y_train_all.npy", y_train)
+np.save(f"{FEATURE_PATH}/groups_train_all.npy", groups_train)
 
-np.save("datasets/X_val_all.npy", X_val)
-np.save("datasets/y_val_all.npy", y_val)
-np.save("datasets/groups_val_all.npy", groups_val)
+np.save(f"{FEATURE_PATH}/X_val_all.npy", X_val)
+np.save("{FEATURE_PATH}/y_val_all.npy", y_val)
+np.save(f"{FEATURE_PATH}/groups_val_all.npy", groups_val)
 
-np.save("datasets/X_test_unseen_all.npy", X_test_unseen)
-np.save("datasets/y_test_unseen_all.npy", y_test_unseen)
-np.save("datasets/groups_test_unseen_all.npy", groups_test_unseen)
-meta_test_unseen.to_parquet("datasets/meta_test_unseen_all.parquet", index=False)
+np.save(f"{FEATURE_PATH}/X_test_unseen_all.npy", X_test_unseen)
+np.save(f"{FEATURE_PATH}/y_test_unseen_all.npy", y_test_unseen)
+np.save(f"{FEATURE_PATH}/groups_test_unseen_all.npy", groups_test_unseen)
+meta_test_unseen.to_parquet(f"{FEATURE_PATH}/meta_test_unseen_all.parquet", index=False)
 
-np.save("datasets/X_test_seen_all.npy", X_test_seen)
-np.save("datasets/y_test_seen_all.npy", y_test_seen)
-np.save("datasets/groups_test_seen_all.npy", groups_test_seen)
-meta_test_seen.to_parquet("datasets/meta_test_seen_all.parquet", index=False)
+np.save(f"{FEATURE_PATH}/X_test_seen_all.npy", X_test_seen)
+np.save(f"{FEATURE_PATH}/y_test_seen_all.npy", y_test_seen)
+np.save(f"{FEATURE_PATH}/groups_test_seen_all.npy", groups_test_seen)
+meta_test_seen.to_parquet(f"{FEATURE_PATH}/meta_test_seen_all.parquet", index=False)

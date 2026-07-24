@@ -139,10 +139,14 @@ def get_fishing_segments(df, seg_id_end):
     df["segment_id"] = ((new_traj | gear_flip ).astype("int64").cumsum()).astype(str) + "-" + seg_id_end
     return df[df["report"].isin(GEAR)].copy()
 
+FOLDER = "Gear_type_classification"
+RESAMPLE_PATH = F"{FOLDER}/Resampled"
+FEATURE_PATH = f"{FOLDER}/Featuresets"
+
 def main(online):
     for year in range(2023, 2023+1):
         for i in range(1, 12+1, 3):
-            df = pd.read_parquet(f"three_months/resampled/{year}_{i}_{i+2}.parquet", engine="pyarrow")
+            df = pd.read_parquet(f"{RESAMPLE_PATH}/{year}_{i}_{i+2}.parquet", engine="pyarrow")
             print("Fixing columns")
             df = add_features(df, online=online)
             print(df.head())
@@ -150,7 +154,7 @@ def main(online):
             seg_id_end = str(year) + "-" + str(i) + "-" + str(i+2)
             df = get_fishing_segments(df, seg_id_end=seg_id_end)
             print(df["report"].unique())
-            df.to_parquet(f"three_months/resampled/{year}_{i}_{i+2}_feats.parquet", index=False)
+            df.to_parquet(f"{FEATURE_PATH}/{year}_{i}_{i+2}.parquet", index=False)
             del df
             gc.collect()
             # CHANFE CHANFE ACCORDING TO WHAT TYPE

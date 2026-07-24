@@ -1,5 +1,5 @@
 # Ignore all big files!
 
+RAW_AIS/
 *.parquet
 *.csv
-Data/

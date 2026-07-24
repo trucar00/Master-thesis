@@ -5,7 +5,6 @@ import numpy as np
 
 # --- Code for downsampling AIS data ---
 
-MAX_INTERP_GAP = pd.Timedelta("60min")
 
 def downsample2(df, step):
     df = df.copy()
